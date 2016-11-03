@@ -27,6 +27,7 @@ def get_file_path(class_folder):
 def load_data(data_path):
     return nib.load(data_path).get_data().astype(np.float64).ravel()
 
+
 def extract_IDs(ftd_csv_df, files_to_load_df):
     # separate all file path strings with the slash character and extract element corresponding to subject ID
     select_IDs = np.array(files_to_load_df['raw'].str.split('/').str.get(8), dtype=int)
