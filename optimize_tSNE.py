@@ -42,9 +42,10 @@ def make_scatter(data, id_ftd, id_neurol, id_psych):
 def inner_loop_iteration(data, rate, perp, n, i, i_total):
     print '#Iteration: {} / {}'.format(i, i_total)
     print 'Learning rate: ({}) Perplexity: ({}) #Components: ({})'.format(rate, perp, n)
-    print
     tsne = TSNE(n_components=n, learning_rate=rate, perplexity=perp, init='pca', method='exact')
     tsne.fit(data)
+    print tsne.kl_divergence_
+    print
     return tsne.kl_divergence_, tsne.embedding_
 
 
