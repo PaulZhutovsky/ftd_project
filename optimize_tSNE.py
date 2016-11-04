@@ -2,7 +2,6 @@ import os.path as osp
 from itertools import product
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -64,7 +63,7 @@ def run():
     n_components = [2, 3]
 
     i_total = len(learn_rate) * len(perplexity) * len(n_components)
-    n_jobs = 15
+    n_jobs = 10
 
     tsne_params = list(product(learn_rate, perplexity, n_components))
     print 'Start Grid Search'

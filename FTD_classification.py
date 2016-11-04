@@ -20,15 +20,14 @@ from evaluation_classifier import Evaluater
 
 SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results_ftr_sel'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
-LOAD_DATA = ''
-# LOAD_DATA = SAVE_DATA
+LOAD_DATA = SAVE_DATA
 
 NUM_SAMPLING_ITER = 2000
 
 # CLASSIFICATION = 'FTDvsPsych'
-# CLASSIFICATION = 'FTDvsNeurol'
+CLASSIFICATION = 'FTDvsNeurol'
 # CLASSIFICATION = 'NeurolvsPsych'
-CLASSIFICATION = 'FTDvsRest'
+# CLASSIFICATION = 'FTDvsRest'
 
 COVARIATES = False
 NUM_NORMALIZED_FEATURES = 3
