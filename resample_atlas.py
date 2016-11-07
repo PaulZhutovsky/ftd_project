@@ -1,6 +1,5 @@
 import os
 import subprocess
-from FTD_classification import ensure_folder
 import xml.etree.ElementTree as ET
 
 FLIRT = '/usr/local/fsl_5.0.9/bin/flirt'
@@ -34,7 +33,8 @@ def cmd_flirt(input_atlas, output_atlas):
 
 
 def resample_atlases():
-    ensure_folder(OUTPUT_DIR)
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
     output_cort_atlas = os.path.join(OUTPUT_DIR, 'HarvardOxford-cort-resampled.nii')
     output_subcort_atlas = os.path.join(OUTPUT_DIR, 'HarvardOxford-subcort-resampled.nii')
     cmd_flirt(CORT_ATLAS, output_cort_atlas)

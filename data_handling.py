@@ -109,7 +109,7 @@ def create_data_matrices(save_path, load_path='', covariates=False, parcellation
         size_classes = {'ftd': len(ftd_files), 'neurol': len(neurological_files), 'psych': len(psychiatry_files)}
 
         data = load_all_data(ftd_files + neurological_files + psychiatry_files,
-                             create_covariates=covariates, parcellate=parcellation)
+                             create_covariates=covariates, parcellation=parcellation)
         class_labels = create_labels(size_classes['ftd'], size_classes['neurol'], size_classes['psych'])
 
         class_labels_df = pd.DataFrame(data=class_labels, columns=['ftd', 'neurol', 'psych', 'rest'])

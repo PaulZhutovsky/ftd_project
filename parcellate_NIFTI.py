@@ -1,6 +1,5 @@
 import re, os
 import resample_atlas as res
-from FTD_classification import ensure_folder
 from glob import glob
 import nibabel as nib
 import numpy as np
@@ -16,7 +15,8 @@ def load_data(data_path):
 
 def parcellate_NIFTI():
     # Resample atlases
-    ensure_folder(parent_dir)
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
     content = os.listdir(parent_dir)
     select_atlases = filter(lambda x: re.search(r'.nii.gz$', x), content)
     if not select_atlases:
