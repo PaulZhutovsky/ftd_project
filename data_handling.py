@@ -6,6 +6,7 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 
+from parcellate_NIFTI import parcellate_NIFTI
 
 PARENT_DIR = '/data/shared/bvFTD/VBM/default/data'
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
@@ -53,10 +54,14 @@ def load_covariates(files_to_load):
     return X
 
 
-def load_all_data(files_to_load, create_covariates):
-    data = np.zeros((len(files_to_load), SIZE_VOXELS))
-    for i, file_path in enumerate(files_to_load):
-        data[i, :] = load_data(file_path)
+def load_all_data(files_to_load, create_covariates, parcellation):
+    if parcellation:
+        data, cort_atlas, subcort_atlas = parcellate_NIFTI()
+    else:
+        data = np.zeros((len(files_to_load), SIZE_VOXELS))
+        for i, file_path in enumerate(files_to_load):
+            data[i, :] = load_data(file_path)
+
     if create_covariates:
         X_covariates = load_covariates(files_to_load)
         data = np.concatenate((data, X_covariates), axis=1)
@@ -66,8 +71,8 @@ def load_all_data(files_to_load, create_covariates):
 def create_labels(class1_num, class2_num, class3_num):
     y = np.zeros((class1_num + class2_num + class3_num, 4), dtype=np.bool)
     y[:class1_num, 0] = True
-    y[class1_num:class1_num+class2_num, 1] = True
-    y[class1_num+class2_num:class1_num+class2_num+class3_num, 2] = True
+    y[class1_num:class1_num + class2_num, 1] = True
+    y[class1_num + class2_num:class1_num + class2_num + class3_num, 2] = True
     y[class1_num:, 3] = True
     return y
 
@@ -83,12 +88,15 @@ def create_classification_data(data, class_labels_df, label1, label2):
     return X, y
 
 
-def create_data_matrices(save_path, load_path='', covariates=False):
-
+def create_data_matrices(save_path, load_path='', covariates=False, parcellation=False):
     if covariates:
         data_filename = 'data_set_with_cov.npy'
+        if parcellation:
+            'data_set_with_cov_with_parc.npy'
     else:
         data_filename = 'data_set.npy'
+        if parcellation:
+            'data_set_with_parc.npy'
 
     if load_path:
         data = np.load(osp.join(load_path, data_filename))
@@ -100,7 +108,8 @@ def create_data_matrices(save_path, load_path='', covariates=False):
 
         size_classes = {'ftd': len(ftd_files), 'neurol': len(neurological_files), 'psych': len(psychiatry_files)}
 
-        data = load_all_data(ftd_files + neurological_files + psychiatry_files, create_covariates=covariates)
+        data = load_all_data(ftd_files + neurological_files + psychiatry_files,
+                             create_covariates=covariates, parcellate=parcellation)
         class_labels = create_labels(size_classes['ftd'], size_classes['neurol'], size_classes['psych'])
 
         class_labels_df = pd.DataFrame(data=class_labels, columns=['ftd', 'neurol', 'psych', 'rest'])

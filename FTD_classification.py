@@ -22,7 +22,7 @@ SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results_ftr_sel'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
 LOAD_DATA = SAVE_DATA
 
-NUM_SAMPLING_ITER = 2000
+NUM_SAMPLING_ITER = 1
 
 # CLASSIFICATION = 'FTDvsPsych'
 CLASSIFICATION = 'FTDvsNeurol'
@@ -30,6 +30,7 @@ CLASSIFICATION = 'FTDvsNeurol'
 # CLASSIFICATION = 'FTDvsRest'
 
 COVARIATES = False
+PARCELLATION = True
 NUM_NORMALIZED_FEATURES = 3
 
 
@@ -163,6 +164,7 @@ def run_classification(X, y, save_folder, label=''):
     print
     print label
     print 'Covariates enabled: {}'.format(COVARIATES)
+    print 'Parcellation enabled: {}'.format(PARCELLATION)
     print 'Started:', datetime.now()
     t_start = time()
     run_ml(X, y, save_folder)
@@ -173,12 +175,17 @@ def run_classification(X, y, save_folder, label=''):
 def run():
     ensure_folder(SAVE_DATA)
     X_ftd_neurol, y_ftd_neurol, X_ftd_psych, y_ftd_psych, X_neurol_psych, y_neurol_psych, X_ftd_rest, y_ftd_rest = \
-        create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, covariates=COVARIATES)
+        create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, covariates=COVARIATES, parcellation=PARCELLATION)
 
     if COVARIATES:
-        save_dir_suffix = '_with_Cov'
+        save_dir_suffix = '_with_Cov_No_Parc'
+        if PARCELLATION:
+            save_dir_suffix = '_with_Cov_with_Parc'
     else:
-        save_dir_suffix = '_no_Cov'
+        save_dir_suffix = '_no_Cov_no_Parc'
+        if PARCELLATION:
+            save_dir_suffix = '_no_Cov_with_Parc'
+
 
     if CLASSIFICATION == 'FTDvsPsych':
         run_classification(X_ftd_psych, y_ftd_psych, SAVE_DIR + '_ftd_psych'
