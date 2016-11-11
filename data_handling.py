@@ -6,9 +6,9 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 
-from parcellate_NIFTI import parcellate_NIFTI
+from parcellate_NIFTI import parcellate_nifti
 
-PARENT_DIR = '/data/shared/bvFTD/VBM/default/data'
+PARENT_DIR = '/data/shared/bvFTD/VBM/default_LOF5/data'
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
 SIZE_VOXELS = 121 * 145 * 121
 
@@ -56,7 +56,7 @@ def load_covariates(files_to_load):
 
 def load_all_data(files_to_load, create_covariates, parcellation):
     if parcellation:
-        data, cort_atlas, subcort_atlas = parcellate_NIFTI()
+        data = parcellate_nifti(files_to_load)
     else:
         data = np.zeros((len(files_to_load), SIZE_VOXELS))
         for i, file_path in enumerate(files_to_load):
@@ -92,11 +92,11 @@ def create_data_matrices(save_path, load_path='', covariates=False, parcellation
     if covariates:
         data_filename = 'data_set_with_cov.npy'
         if parcellation:
-            'data_set_with_cov_with_parc.npy'
+            data_filename = 'data_set_with_cov_with_parc.npy'
     else:
         data_filename = 'data_set.npy'
         if parcellation:
-            'data_set_with_parc.npy'
+            data_filename = 'data_set_with_parc.npy'
 
     if load_path:
         data = np.load(osp.join(load_path, data_filename))
