@@ -100,7 +100,6 @@ def check_diff_models(X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
                                                                                                          y_inner_cv)))
     accuracy = np.array(accuracy)
     id_best_clf = np.argmax([accuracy[i * n_folds:n_folds * (i + 1)].mean() for i in xrange(len(clfs_labels))])
-    import ipdb; ipdb.set_trace()
     best_clf = clfs[id_best_clf]
     best_clf_label = clfs_labels[id_best_clf]
 
