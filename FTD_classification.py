@@ -33,11 +33,13 @@ CLASSIFICATION = 'FTDvsPsych'
 
 # TODO: COVARIATES DO NOT WORK AS OF NOW; HAS TO BE FIXED!!!!
 COVARIATES = False
-PARCELLATION = True
+PARCELLATION = False
 NUM_NORMALIZED_FEATURES = 3
 
 # In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
 z_THRESHOLD = {True: 1.5, False: 3.5}
+# For LDA to work we need to reduce the number of features. For the atlas case (PARCELLATION=True) this is not required
+LDA_THRESHOLD = {True: 0., False: 3.5}
 
 
 def get_sampling_method(X, y):
@@ -79,9 +81,11 @@ def get_models_to_check():
     feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear'))])
 
+    feat_sel_2 = FeatureSelector(z_thresh=LDA_THRESHOLD[PARCELLATION])
     lda = LDA(solver='lsqr', shrinkage='auto')
+    feat_sel_lda = Pipeline([('feat_sel', feat_sel_2), ('lda', lda)])
 
-    clfs = [svm, pca_svm, feat_sel_svm, lda]
+    clfs = [svm, pca_svm, feat_sel_svm, feat_sel_lda]
     clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm', 'lda']
 
     return clfs, clfs_labels
