@@ -7,31 +7,37 @@ from time import time
 import numpy as np
 from feature_selector import FeatureSelector
 from imblearn.under_sampling import RandomUnderSampler
-from joblib import Parallel, delayed
+from sklearn.externals.joblib import Parallel, delayed
 from sklearn.decomposition import PCA
 from sklearn.metrics import roc_curve
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 from data_handling import ensure_folder, create_data_matrices, apply_masking
 from evaluation_classifier import Evaluater
+
 
 SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results_ftr_sel'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
 LOAD_DATA = SAVE_DATA
 
-NUM_SAMPLING_ITER = 1
+NUM_SAMPLING_ITER = 1000
 
-# CLASSIFICATION = 'FTDvsPsych'
-CLASSIFICATION = 'FTDvsNeurol'
+CLASSIFICATION = 'FTDvsPsych'
+# CLASSIFICATION = 'FTDvsNeurol'
 # CLASSIFICATION = 'NeurolvsPsych'
 # CLASSIFICATION = 'FTDvsRest'
 
+# TODO: COVARIATES DO NOT WORK AS OF NOW; HAS TO BE FIXED!!!!
 COVARIATES = False
 PARCELLATION = True
 NUM_NORMALIZED_FEATURES = 3
+
+# In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
+z_THRESHOLD = {True: 1.5, False: 3.5}
 
 
 def get_sampling_method(X, y):
@@ -48,31 +54,36 @@ def sample(X, y, sampler):
     return sampler.sample(X, y)
 
 
-def inner_loop_iteration(clf, id_train, id_test, X, y):
+def inner_loop_iteration(clf, id_train, id_test, X, y, use_covariates=COVARIATES, num_covariates=NUM_NORMALIZED_FEATURES):
     X_train, y_train = X[id_train], y[id_train]
     X_test, y_test = X[id_test], y[id_test]
 
-    if COVARIATES:
+    if use_covariates:
         inner_featureNormalizer = MinMaxScaler()
-        inner_featureNormalizer.fit(X_train[:, -NUM_NORMALIZED_FEATURES:])
+        inner_featureNormalizer.fit(X_train[:, -num_covariates:])
         # Parallel processing sets matrix flags to read-only, change to writeable to allow assignment
         X_train.flags.writeable = X_test.flags.writeable = True
-        X_train[:, -NUM_NORMALIZED_FEATURES:] = inner_featureNormalizer.transform(X_train[:, -NUM_NORMALIZED_FEATURES:])
-        X_test[:, -NUM_NORMALIZED_FEATURES:] = inner_featureNormalizer.transform(X_test[:, -NUM_NORMALIZED_FEATURES:])
+        X_train[:, -num_covariates:] = inner_featureNormalizer.transform(X_train[:, -num_covariates:])
+        X_test[:, -num_covariates:] = inner_featureNormalizer.transform(X_test[:, -num_covariates:])
 
     clf.fit(X_train, y_train)
     return clf.score(X_test, y_test)
 
 
 def get_models_to_check():
+    svm = SVC(kernel='linear')
+
     pca = PCA(n_components=0.9)
     pca_svm = Pipeline([('pca', pca), ('svm', SVC(kernel='linear'))])
 
-    feat_sel = FeatureSelector()
+    feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear'))])
 
-    clfs = [SVC(kernel='linear'), pca_svm, feat_sel_svm]
-    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm']
+    lda = LDA(solver='lsqr', shrinkage='auto')
+
+    clfs = [svm, pca_svm, feat_sel_svm, lda]
+    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm', 'lda']
+
     return clfs, clfs_labels
 
 
@@ -83,11 +94,13 @@ def check_diff_models(X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
     n_jobs = len(clfs_labels) * n_folds
     print 'Choose best model'
     accuracy = Parallel(n_jobs=n_jobs, verbose=1)(delayed(inner_loop_iteration)(clf, id_train, id_test, X_inner_cv,
-                                                                                y_inner_cv)
+                                                                                y_inner_cv, use_covariates=COVARIATES,
+                                                                                num_covariates=NUM_NORMALIZED_FEATURES)
                                                   for clf, (id_train, id_test) in product(clfs, cv.split(X_inner_cv,
                                                                                                          y_inner_cv)))
     accuracy = np.array(accuracy)
-    id_best_clf = np.argmax([accuracy[i*n_folds:n_folds*(i+1)].mean() for i in xrange(len(clfs_labels))])
+    id_best_clf = np.argmax([accuracy[i * n_folds:n_folds * (i + 1)].mean() for i in xrange(len(clfs_labels))])
+    import ipdb; ipdb.set_trace()
     best_clf = clfs[id_best_clf]
     best_clf_label = clfs_labels[id_best_clf]
 
@@ -185,7 +198,6 @@ def run():
         save_dir_suffix = '_no_Cov_no_Parc'
         if PARCELLATION:
             save_dir_suffix = '_no_Cov_with_Parc'
-
 
     if CLASSIFICATION == 'FTDvsPsych':
         run_classification(X_ftd_psych, y_ftd_psych, SAVE_DIR + '_ftd_psych'
