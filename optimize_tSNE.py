@@ -27,7 +27,7 @@ def load_data():
 def make_scatter(data, id_ftd, id_neurol, id_psych):
     colors = ['r', 'g', 'b']
     plt.scatter(data[id_ftd, 0], data[id_ftd, 1], c=colors[0], s=30)
-    if data.shape[1] == 2:
+    if np.any(np.isnan(data)):
         plt.scatter(data[id_neurol, 0], data[id_neurol, 1], c=colors[1], s=30)
         plt.scatter(data[id_psych, 0], data[id_psych, 1], c=colors[1], s=30)
         plt.legend(['FTD', 'Rest'])
