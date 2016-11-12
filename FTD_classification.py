@@ -33,7 +33,7 @@ CLASSIFICATION = 'FTDvsPsych'
 
 # TODO: COVARIATES DO NOT WORK AS OF NOW; HAS TO BE FIXED!!!!
 COVARIATES = False
-PARCELLATION = False
+PARCELLATION = True
 NUM_NORMALIZED_FEATURES = 3
 
 # In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
@@ -71,22 +71,16 @@ def inner_loop_iteration(clf, id_train, id_test, X, y, use_covariates=COVARIATES
 
 
 def get_models_to_check():
-    svm = SVC(kernel='linear')
+    svm = SVC(kernel='linear', probability=True)
 
     pca = PCA(n_components=0.9)
-    pca_svm = Pipeline([('pca', pca), ('svm', SVC(kernel='linear'))])
+    pca_svm = Pipeline([('pca', pca), ('svm', SVC(kernel='linear', probability=True))])
 
     feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
-    feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear'))])
-    # For LDA to work we need to reduce the number of features. For the atlas case (PARCELLATION=True) this is not
-    # required. I use PCA because it decorrelates the data and apparently LDA requires non-collinear data.
-    if PARCELLATION:
-        lda = LDA(solver='lsqr', shrinkage='auto')
-    else:
-        lda = Pipeline([('pca', PCA(n_components=0.8)), ('lda', LDA(solver='lsqr', shrinkage='auto'))])
+    feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear', probability=True))])
 
-    clfs = [svm, pca_svm, feat_sel_svm, lda]
-    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm', 'lda']
+    clfs = [svm, pca_svm, feat_sel_svm]
+    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm']
 
     return clfs, clfs_labels
 
@@ -117,7 +111,7 @@ def check_diff_models(X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
 
     best_clf.fit(X_inner_cv, y_inner_cv)
     y_pred = best_clf.predict(X_test_outer_cv)
-    y_score = best_clf.decision_function(X_test_outer_cv)
+    y_score = best_clf.predict_proba(X_test_outer_cv)
     return y_pred, y_score, best_clf_label
 
 
