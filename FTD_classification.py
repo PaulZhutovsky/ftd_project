@@ -111,7 +111,7 @@ def check_diff_models(X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
 
     best_clf.fit(X_inner_cv, y_inner_cv)
     y_pred = best_clf.predict(X_test_outer_cv)
-	y_score = best_clf.predict_proba(X_test_outer_cv)[:, 0]
+    y_score = best_clf.predict_proba(X_test_outer_cv)[:, 0]
     return y_pred, y_score, best_clf_label
 
 
