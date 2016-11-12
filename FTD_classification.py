@@ -20,7 +20,7 @@ from data_handling import ensure_folder, create_data_matrices, apply_masking
 from evaluation_classifier import Evaluater
 
 
-SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results_ftr_sel'
+SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
 LOAD_DATA = SAVE_DATA
 
