@@ -2,7 +2,7 @@ from visualize_results import run
 import os.path as osp
 
 
-DATA_FOLDER = '/data/shared/bvFTD/Machine_learning/'
+DATA_FOLDER = '/data/shared/bvFTD/Machine_Learning/'
 DATA_PATTERN = 'results*no_Cov_with_Parc'
 SAVE_FOLDER = osp.join(DATA_FOLDER, 'figures_no_Cov_with_Parc')
 

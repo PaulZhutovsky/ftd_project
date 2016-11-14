@@ -160,7 +160,7 @@ def compute_average_roc(roc_curves, n_folds=5):
     :param n_folds:
     :return:
     """
-    
+
     n_results = len(roc_curves)
     mean_fpr = np.linspace(0, 1, 100)
     roc_avg = []
@@ -204,15 +204,19 @@ def plotter_results(data_pattern, save_folder):
 
     ensure_folder(save_folder)
 
+    print 'Plot performance metrics'
     metrics, metric_label = load_performance(results_folder)
     histogram_of_performance(metrics, metric_label, title_results, save_folder)
 
+    print 'Plot chosen models'
     best_models = load_model_chosen(results_folder)
     plot_best_models(best_models, title_results, osp.join(save_folder, 'best_models.png'))
 
+    print 'Plot subject predictions'
     predictions_subjects = load_predictions(results_folder)
     plot_predictions(predictions_subjects, title_results, save_file=osp.join(save_folder, 'subject_predictions.png'))
 
+    print 'Plot ROC curves'
     roc_curves = load_roc(results_folder)
     plot_roc(roc_curves, title_results, osp.join(save_folder, 'roc_curves.png'))
 
