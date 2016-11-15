@@ -4,7 +4,6 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 
-
 scans_dir = '/data/shared/bvFTD/VBM/default_LOF5/data'
 atlas_dir = '/data/shared/bvFTD/Machine_Learning/data/parcellated_GM_data'
 

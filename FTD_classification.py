@@ -22,7 +22,7 @@ from evaluation_classifier import Evaluater
 
 SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
-LOAD_DATA = SAVE_DATA
+LOAD_DATA = ''
 
 NUM_SAMPLING_ITER = 1000
 
@@ -33,7 +33,8 @@ CLASSIFICATION = 'FTDvsPsych'
 
 # TODO: COVARIATES DO NOT WORK AS OF NOW; HAS TO BE FIXED!!!!
 COVARIATES = False
-PARCELLATION = True
+PARCELLATION = False
+SMOOTHING = True
 NUM_NORMALIZED_FEATURES = 3
 
 # In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
@@ -185,16 +186,13 @@ def run_classification(X, y, save_folder, label=''):
 def run():
     ensure_folder(SAVE_DATA)
     X_ftd_neurol, y_ftd_neurol, X_ftd_psych, y_ftd_psych, X_neurol_psych, y_neurol_psych, X_ftd_rest, y_ftd_rest = \
-        create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, covariates=COVARIATES, parcellation=PARCELLATION)
+        create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, covariates=COVARIATES, parcellation=PARCELLATION,
+                             smoothing=SMOOTHING)
 
-    if COVARIATES:
-        save_dir_suffix = '_with_Cov_No_Parc'
-        if PARCELLATION:
-            save_dir_suffix = '_with_Cov_with_Parc'
-    else:
-        save_dir_suffix = '_no_Cov_no_Parc'
-        if PARCELLATION:
-            save_dir_suffix = '_no_Cov_with_Parc'
+    cov_suffix = '_with_Cov' if COVARIATES else '_no_Cov'
+    parc_suffix = '_with_Parc' if PARCELLATION else '_no_Parc'
+    mod_suffix = '_Smoothed' if SMOOTHING else '_Unsmoothed'
+    save_dir_suffix = cov_suffix + parc_suffix + mod_suffix
 
     if CLASSIFICATION == 'FTDvsPsych':
         run_classification(X_ftd_psych, y_ftd_psych, SAVE_DIR + '_ftd_psych'

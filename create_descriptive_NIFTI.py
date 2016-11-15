@@ -5,10 +5,14 @@ import nibabel as nib
 import numpy as np
 from feature_selector import FeatureSelector
 
+REG_PATTERN = 'results_*_no_Cov_no_Parc'
+SMOOTHING = True
+
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
-PARENT_DIR = '/data/shared/bvFTD/VBM/default/data'
-RESULTS_FOLDER = sorted(glob(osp.join('/data/shared/bvFTD/Machine_Learning', 'results_ftr_sel_ftd*')))
-AFFINE_MATRIX = nib.load('/data/shared/bvFTD/VBM/default/data/'
+PARENT_DIR_SMOOTHED = '/data/shared/bvFTD/VBM/default_LOF5/data'
+PARENT_DIR_UNSMOOTHED = '/data/shared/bvFTD/VBM/default_non_modulated_LOF5/data'
+RESULTS_FOLDER = sorted(glob(osp.join('/data/shared/bvFTD/Machine_Learning', REG_PATTERN)))
+AFFINE_MATRIX = nib.load('/data/shared/bvFTD/VBM/default_LOF5/data/'
                          'bvFTD/4908/structural/mri/smwp14908_T1_reoriented_time01.nii').affine
 
 Z_TRESHOLDS = [2., 2.5, 3., 3.5, 4.]
@@ -18,6 +22,7 @@ threshold_correct = 0.5
 
 
 def load_all_data():
+    PARENT_DIR = PARENT_DIR_SMOOTHED if SMOOTHING else PARENT_DIR_UNSMOOTHED
     ftd = sorted(glob(osp.join(PARENT_DIR, CLASSES_TRANSFORM['ftd'], '*', 'structural', 'mri', 'smw*')))
     neurol = sorted(glob(osp.join(PARENT_DIR, CLASSES_TRANSFORM['neurol'], '*', 'structural', 'mri', 'smw*')))
     psych = sorted(glob(osp.join(PARENT_DIR, CLASSES_TRANSFORM['psych'], '*', 'structural', 'mri', 'smw*')))
@@ -69,12 +74,12 @@ def run():
     data, data_idx_map = load_all_data()
 
     for i in xrange(len(RESULTS_FOLDER)):
-        save_folder = osp.join(RESULTS_FOLDER[i], 'descriptive_NIFTIs')
+        save_folder = osp.join(RESULTS_FOLDER[i], 'descriptive_T-tests')
 
         if not osp.exists(save_folder):
             mkdir(save_folder)
 
-        classifiers = RESULTS_FOLDER[i].split('results_ftr_sel_')[1]
+        classifiers = RESULTS_FOLDER[i].split('results_')[1]
         class1, class2 = classifiers.split('_')[:2]
         class1_idx, class2_idx = data_idx_map[class1], data_idx_map[class2]
         class1_data, class2_data = data[..., class1_idx], data[..., class2_idx]

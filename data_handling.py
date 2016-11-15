@@ -8,12 +8,14 @@ import pandas as pd
 
 from parcellate_NIFTI import parcellate_nifti
 
-PARENT_DIR = '/data/shared/bvFTD/VBM/default_LOF5/data'
+PARENT_DIR_SMOOTHED = '/data/shared/bvFTD/VBM/default_LOF5/data'
+PARENT_DIR_UNSMOOTHED = '/data/shared/bvFTD/VBM/default_non_modulated_LOF5/data'
+
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
 SIZE_VOXELS = 121 * 145 * 121
 
 ftd_csv_file = '/data/shared/bvFTD/Machine_Learning/data/AMC_VUMC_bvFTD.csv'
-TIV_csv_file = '/data/shared/bvFTD/Machine_Learning/data/TIV.csv'
+TIV_csv_file = '/data/shared/bvFTD/Machine_Learning/data/TIV_ML_LOF5.csv'
 
 
 def ensure_folder(folder_dir):
@@ -21,8 +23,10 @@ def ensure_folder(folder_dir):
         os.makedirs(folder_dir)
 
 
-def get_file_path(class_folder):
-    return sorted(glob(osp.join(PARENT_DIR, class_folder, '*', 'structural', 'mri', 'smw*')))
+def get_file_path(class_folder, smoothing=False):
+    if smoothing:
+        return sorted(glob(osp.join(PARENT_DIR_SMOOTHED, class_folder, '*', 'structural', 'mri', 'smw*')))
+    return sorted(glob(osp.join(PARENT_DIR_UNSMOOTHED, class_folder, '*', 'structural', 'wc1*')))
 
 
 def load_data(data_path):
@@ -51,6 +55,7 @@ def load_covariates(files_to_load):
 
     # verify whether same subjects are loaded
     X = np.concatenate((X_TIV, X_sex_age), axis=1)
+
     return X
 
 
@@ -88,23 +93,19 @@ def create_classification_data(data, class_labels_df, label1, label2):
     return X, y
 
 
-def create_data_matrices(save_path, load_path='', covariates=False, parcellation=False):
-    if covariates:
-        data_filename = 'data_set_with_cov.npy'
-        if parcellation:
-            data_filename = 'data_set_with_cov_with_parc.npy'
-    else:
-        data_filename = 'data_set.npy'
-        if parcellation:
-            data_filename = 'data_set_with_parc.npy'
+def create_data_matrices(save_path, load_path='', covariates=False, parcellation=False, smoothing=False):
+    cov_suffix = '_with_Cov' if covariates else '_no_Cov'
+    parc_suffix = '_with_Parc' if parcellation else '_no_Parc'
+    mod_suffix = '_Smoothed' if smoothing else '_Unsmoothed'
+    data_filename = 'data_set' + cov_suffix + parc_suffix + mod_suffix
 
     if load_path:
         data = np.load(osp.join(load_path, data_filename))
         class_labels_df = pd.read_csv(osp.join(load_path, 'class_labels.csv'))
     else:
-        ftd_files = get_file_path(CLASSES_TRANSFORM['ftd'])
-        neurological_files = get_file_path(CLASSES_TRANSFORM['neurol'])
-        psychiatry_files = get_file_path(CLASSES_TRANSFORM['psych'])
+        ftd_files = get_file_path(CLASSES_TRANSFORM['ftd'], smoothing=smoothing)
+        neurological_files = get_file_path(CLASSES_TRANSFORM['neurol'], smoothing=smoothing)
+        psychiatry_files = get_file_path(CLASSES_TRANSFORM['psych'], smoothing=smoothing)
 
         size_classes = {'ftd': len(ftd_files), 'neurol': len(neurological_files), 'psych': len(psychiatry_files)}
 
