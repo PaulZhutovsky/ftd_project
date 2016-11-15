@@ -42,7 +42,8 @@ def plot_histograms(data, title, figtitle, range_x=(0, 1), save_name='results.pn
         ax[id_plot].tick_params(axis='both', labelsize=18)
         ax[id_plot].set_title('{}: M: {:.4f} SE: {:.4f} SD: {:.4f}'.format(title[id_plot], data_m, data_se, data_sd),
                               fontsize=26)
-
+    if n_plots < ax.size:
+        ax[-1].axis('off')
     fig.suptitle(figtitle, fontsize=28)
     fig.savefig(save_name)
 
@@ -64,7 +65,8 @@ def plot_best_models(best_models, title_plots, save_name='model.png'):
         ax[id_plot].set_title(title_plots[id_plot], fontsize=20)
         if (id_plot == 0) or (id_plot == 2):
             ax[id_plot].set_ylabel('chosen model (%)', fontsize=20)
-
+    if n_plots < ax.size:
+        ax[-1].axis('off')
     fig.savefig(save_name)
 
 
@@ -93,6 +95,8 @@ def plot_predictions(predictions_all, title_plots, n_ftd=18, threshold_correct=5
         ax[id_plot].set_ylabel('% correct', fontsize=20)
         ax[id_plot].tick_params(axis='both', labelsize=18)
         ax[id_plot].set_xlim((0, id_other.max() + 1))
+    if n_plots < ax.size:
+        ax[-1].axis('off')
     fig.savefig(save_file)
 
 
@@ -112,6 +116,8 @@ def plot_roc(roc_data, title_plots, save_file='roc.png'):
         ax[id_plot].tick_params(axis='both', labelsize=18)
         ax[id_plot].set_xlim((-0.05, 1.05))
         ax[id_plot].set_ylim((-0.05, 1.05))
+    if n_plots < ax.size:
+        ax[-1].axis('off')
     fig.savefig(save_file)
 
 
@@ -192,9 +198,8 @@ def histogram_of_performance(data, data_labels, title_results, save_folder):
 
 def strip_results_folder_parts(results_folder):
     results_folder = np.array([osp.basename(results) for results in results_folder])
-    results_folder = np.char.replace(results_folder, 'results_', '')
-    results_folder = np.char.replace(results_folder, '_no_Cov_with_Parc', '')
-    results_folder = np.char.replace(results_folder, '_', ' vs. ')
+    results_folder = np.char.split(results_folder, '_')
+    results_folder = np.array([folder[1] + ' vs. ' + folder[2] for folder in results_folder])
     return results_folder
 
 

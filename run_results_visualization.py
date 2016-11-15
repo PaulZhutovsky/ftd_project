@@ -3,8 +3,8 @@ import os.path as osp
 
 
 DATA_FOLDER = '/data/shared/bvFTD/Machine_Learning/'
-DATA_PATTERN = 'results*no_Cov_with_Parc'
-SAVE_FOLDER = osp.join(DATA_FOLDER, 'figures_no_Cov_with_Parc')
+DATA_PATTERN = 'results_ftd_*no_Cov_no_Parc_Smoothed'
+SAVE_FOLDER = osp.join(DATA_FOLDER, 'figures_no_Cov_no_Parc_Smoothed')
 
 if __name__ == '__main__':
     args = {'FOLDER': DATA_FOLDER,
