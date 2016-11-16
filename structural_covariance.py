@@ -26,6 +26,14 @@ class StructuralCovariance(object):
 
         return structural_covariance
 
+    def transform2(self, X, y=None):
+        n_dims = X.shape[1]
+        X = self.standardize_subjects(X)
+        X = self.standardize_rois(X)
+        ids_triu = np.triu_indices(n_dims, k=1)
+        distances = X[:, :, np.newaxis] - X[:, np.newaxis, :]
+        return np.array([1./np.exp(d[ids_triu] ** 2) for d in distances])
+
     def fit_transform(self, X, y=None):
         self.fit(X, y=None)
         return self.transform(X, y=None)
