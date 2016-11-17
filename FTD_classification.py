@@ -14,27 +14,26 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 from data_handling import ensure_folder, create_data_matrices, apply_masking
 from evaluation_classifier import Evaluater
+from structural_covariance import StructuralCovariance
 
 
 SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
-LOAD_DATA = ''
+LOAD_DATA = SAVE_DATA
 
 NUM_SAMPLING_ITER = 1000
 
-CLASSIFICATION = 'FTDvsPsych'
+# CLASSIFICATION = 'FTDvsPsych'
 # CLASSIFICATION = 'FTDvsNeurol'
-# CLASSIFICATION = 'NeurolvsPsych'
+CLASSIFICATION = 'NeurolvsPsych'
 # CLASSIFICATION = 'FTDvsRest'
 
-# TODO: COVARIATES DO NOT WORK AS OF NOW; HAS TO BE FIXED!!!!
 COVARIATES = False
-PARCELLATION = False
-SMOOTHING = True
+PARCELLATION = True
+SMOOTHING = False
 NUM_NORMALIZED_FEATURES = 3
 
 # In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
@@ -80,8 +79,16 @@ def get_models_to_check():
     feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear', probability=True))])
 
-    clfs = [svm, pca_svm, feat_sel_svm]
-    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm']
+    cov_svm = []
+    cov_label = []
+    if PARCELLATION:
+        struc_cov = StructuralCovariance()
+        svm = SVC(kernel='linear', probability=True)
+        cov_svm = [Pipeline([('struc_cov', struc_cov), ('svm', svm)])]
+        cov_label = ['struct_cov']
+
+    clfs = [svm, pca_svm, feat_sel_svm] + cov_svm
+    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm'] + cov_label
 
     return clfs, clfs_labels
 
