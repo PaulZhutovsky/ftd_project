@@ -32,10 +32,11 @@ class Evaluater(object):
         if self.loo:
             self.evaluation_string = 'Accuracy: {accuracy:.2f}'.format(**self.results)
         else:
-            self.evaluation_string = 'Accuracy: {accuracy:.2f}, AUC: {AUC:.2f}, F1-score: {F1:.2f}, Recall: ' \
+            self.evaluation_string = 'Accuracy: {balanced_accuracy:.2f}, AUC: {AUC:.2f}, F1-score: {F1:.2f}, Recall: ' \
                                      '{recall:.2f}, Precision: {precision:.2f}, Sensitivity: {sensitivity:.2f}, ' \
                                      'Specificity: {specificity:.2f}, ' \
-                                     'PPV: {positive_predictive_value:.2f}'.format(**self.results)
+                                     'PPV: {positive_predictive_value:.2f}' \
+                                     'NPV: {negative_predictive_value:.2f}'.format(**self.results)
         print self.evaluation_string
 
     def set_evaluations(self):
@@ -44,7 +45,7 @@ class Evaluater(object):
                                  ('predictions_1st', self.__return_prediction_first),
                                  ('predictions_2nd', self.__return_prediction_second),
                                  ('true_1st', self.__return_true_first),
-                                 ('ture_2nd', self.__return_true_second)])
+                                 ('true_2nd', self.__return_true_second)])
         else:
             evals = OrderedDict([('accuracy', accuracy_score),
                                  ('balanced_accuracy', self.__balanced_accuracy),
@@ -54,7 +55,8 @@ class Evaluater(object):
                                  ('precision', precision_score),
                                  ('sensitivity', recall_score),           # recall is the same as sensitivity
                                  ('specificity', self.__specificity),
-                                 ('positive_predictive_value', self.__ppv)])
+                                 ('positive_predictive_value', self.__ppv),
+                                 ('negative_predictive_value', self.__npv)])
         return evals
 
     @staticmethod
@@ -64,15 +66,20 @@ class Evaluater(object):
     @staticmethod
     def __ppv(y_true, y_pred):
         # noinspection PyTypeChecker
-        ppv = np.sum((y_true == 1) & (y_pred == 1)) / float(np.sum(y_pred == 1))
+        ppv = np.sum((y_true == 1) & (y_pred == 1)) / np.sum(y_pred == 1, dtype=np.float)
         if np.isnan(ppv):
             return 0
         return ppv
 
     @staticmethod
+    def __npv(y_true, y_pred):
+        # noinspection PyTypeChecker
+        npv = np.sum((y_true == 0) & (y_pred == 0)) / np.sum(y_pred == 0, dtype=np.float)
+
+    @staticmethod
     def __specificity(y_true, y_pred):
         # noinspection PyTypeChecker
-        return np.sum((y_true == 0) & (y_pred == 0)) / float(np.sum(y_true == 0))
+        return np.sum((y_true == 0) & (y_pred == 0)) / np.sum(y_true == 0, dtype=np.float)
 
     @staticmethod
     def __return_prediction_first(y_pred):
