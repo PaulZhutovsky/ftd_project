@@ -12,13 +12,12 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import roc_curve
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
 
-from data_handling import ensure_folder, create_data_matrices, apply_masking
+import data_handling as data_funs
 from evaluation_classifier import Evaluater
 from structural_covariance import StructuralCovariance
-
+from covariate_selector import CovariateSelector
 
 SAVE_DIR = '/data/shared/bvFTD/Machine_Learning/results'
 SAVE_DATA = '/data/shared/bvFTD/Machine_Learning/data'
@@ -26,15 +25,17 @@ LOAD_DATA = SAVE_DATA
 
 NUM_SAMPLING_ITER = 1000
 
-# CLASSIFICATION = 'FTDvsPsych'
+CLASSIFICATION = 'FTDvsPsych'
 # CLASSIFICATION = 'FTDvsNeurol'
-CLASSIFICATION = 'NeurolvsPsych'
+# CLASSIFICATION = 'NeurolvsPsych'
 # CLASSIFICATION = 'FTDvsRest'
 
-COVARIATES = False
-PARCELLATION = True
-SMOOTHING = False
-NUM_NORMALIZED_FEATURES = 3
+COVARIATES = True
+PARCELLATION = False
+SMOOTHING = True
+# structural covariance can/will be only used in the case of parcellation the syntax below ensures that even if it is
+# switched on it will only be used if PARCELLATION is True as well
+STRUCTURAL_COVARIANCE = False & PARCELLATION
 
 # In the ATLAS case (PARCELLATION=True) the z-threshold is way to strong so we will have to adjust it
 z_THRESHOLD = {True: 1.5, False: 3.5}
@@ -46,31 +47,57 @@ def get_sampling_method(X, y):
     return under_sampler
 
 
-def get_cross_validator(n_folds):
-    return StratifiedKFold(n_splits=n_folds, shuffle=True)
+def get_cross_validator(n_folds, **kwargs):
+    return StratifiedKFold(n_splits=n_folds, shuffle=True, **kwargs)
 
 
 def sample(X, y, sampler):
     return sampler.sample(X, y)
 
 
-def inner_loop_iteration(clf, id_train, id_test, X, y, use_covariates=COVARIATES, num_covariates=NUM_NORMALIZED_FEATURES):
+def inner_loop_iteration(clf, id_train, id_test, X, y, use_covariates=COVARIATES):
     X_train, y_train = X[id_train], y[id_train]
     X_test, y_test = X[id_test], y[id_test]
 
+    # TODO: Covariates
     if use_covariates:
-        inner_featureNormalizer = MinMaxScaler()
-        inner_featureNormalizer.fit(X_train[:, -num_covariates:])
-        # Parallel processing sets matrix flags to read-only, change to writeable to allow assignment
-        X_train.flags.writeable = X_test.flags.writeable = True
-        X_train[:, -num_covariates:] = inner_featureNormalizer.transform(X_train[:, -num_covariates:])
-        X_test[:, -num_covariates:] = inner_featureNormalizer.transform(X_test[:, -num_covariates:])
+        clf.named_steps['cov'].set_ids(id_train, id_test)
 
     clf.fit(X_train, y_train)
     return clf.score(X_test, y_test)
 
 
+def check_diff_models(train_id, test_id, X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
+    clfs, clfs_labels = get_models_to_check()
+    # the random state is added to ensure the usage of the same CV/fold order for the models in question to get the
+    # 'fairest' comparison possible. To make it explicit we seed the cross-validator with the same random_state
+    cv = get_cross_validator(n_folds, random_state=int(time))
+
+    n_jobs = len(clfs_labels) * n_folds
+    print 'Choose best model'
+    accuracy = Parallel(n_jobs=n_jobs, verbose=1)(delayed(inner_loop_iteration)(clf, id_train, id_test, X_inner_cv,
+                                                                                y_inner_cv, use_covariates=COVARIATES)
+                                                  for clf, (id_train, id_test) in product(clfs, cv.split(X_inner_cv,
+                                                                                                         y_inner_cv)))
+    accuracy = np.array(accuracy)
+    id_best_clf = np.argmax([accuracy[i * n_folds:n_folds * (i + 1)].mean() for i in xrange(len(clfs_labels))])
+    best_clf = clfs[id_best_clf]
+    best_clf_label = clfs_labels[id_best_clf]
+
+    # TODO: Covariates
+    if COVARIATES:
+        best_clf.named_steps['cov'].set_ids(train_id, test_id)
+
+    best_clf.fit(X_inner_cv, y_inner_cv)
+    y_pred = best_clf.predict(X_test_outer_cv)
+    y_score = best_clf.predict_proba(X_test_outer_cv)[:, best_clf.n_classes_ == 1]
+    return y_pred, y_score, best_clf_label
+
+
 def get_models_to_check():
+    if COVARIATES:
+        return use_covariates()
+
     svm = SVC(kernel='linear', probability=True)
 
     pca = PCA(n_components=0.9)
@@ -79,80 +106,74 @@ def get_models_to_check():
     feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear', probability=True))])
 
-    cov_svm = []
-    cov_label = []
-    if PARCELLATION:
+    struct_cov_svm, struct_cov_label = [], []
+    if STRUCTURAL_COVARIANCE:
         struc_cov = StructuralCovariance()
         svm = SVC(kernel='linear', probability=True)
-        cov_svm = [Pipeline([('struc_cov', struc_cov), ('svm', svm)])]
-        cov_label = ['struct_cov']
+        struct_cov_svm = [Pipeline([('struc_cov', struc_cov), ('svm', svm)])]
+        struct_cov_label = ['struct_cov']
 
-    clfs = [svm, pca_svm, feat_sel_svm] + cov_svm
-    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm'] + cov_label
+    clfs = [svm, pca_svm, feat_sel_svm] + struct_cov_svm
+    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm'] + struct_cov_label
 
     return clfs, clfs_labels
 
 
-def check_diff_models(X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5):
-    clfs, clfs_labels = get_models_to_check()
-    cv = get_cross_validator(n_folds)
-
-    n_jobs = len(clfs_labels) * n_folds
-    print 'Choose best model'
-    accuracy = Parallel(n_jobs=n_jobs, verbose=1)(delayed(inner_loop_iteration)(clf, id_train, id_test, X_inner_cv,
-                                                                                y_inner_cv, use_covariates=COVARIATES,
-                                                                                num_covariates=NUM_NORMALIZED_FEATURES)
-                                                  for clf, (id_train, id_test) in product(clfs, cv.split(X_inner_cv,
-                                                                                                         y_inner_cv)))
-    accuracy = np.array(accuracy)
-    id_best_clf = np.argmax([accuracy[i * n_folds:n_folds * (i + 1)].mean() for i in xrange(len(clfs_labels))])
-    best_clf = clfs[id_best_clf]
-    best_clf_label = clfs_labels[id_best_clf]
-
-    if COVARIATES:
-        outer_featureNormalizer = MinMaxScaler()
-        outer_featureNormalizer.fit(X_inner_cv[:, -NUM_NORMALIZED_FEATURES:])
-        X_inner_cv[:, -NUM_NORMALIZED_FEATURES:] = \
-            outer_featureNormalizer.transform(X_inner_cv[:, -NUM_NORMALIZED_FEATURES:])
-        X_test_outer_cv[:, -NUM_NORMALIZED_FEATURES:] = \
-            outer_featureNormalizer.transform(X_test_outer_cv[:, -NUM_NORMALIZED_FEATURES:])
-
-    best_clf.fit(X_inner_cv, y_inner_cv)
-    y_pred = best_clf.predict(X_test_outer_cv)
-    y_score = best_clf.predict_proba(X_test_outer_cv)[:, 1]
-    return y_pred, y_score, best_clf_label
+def use_covariates():
+    """
+    TODO: NOT WORKING?FINISHED YET!
+    """
+    svm = SVC(kernel='linear', probability=True)
+    cov = CovariateSelector()
+    svm = Pipeline([('cov', cov), ('svm', svm)])
+    pca = PCA(n_components=0.9)
+    cov = CovariateSelector()
+    pca_svm = Pipeline([('pca', pca), ('cov', cov), ('svm', SVC(kernel='linear', probability=True))])
+    feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
+    cov = CovariateSelector()
+    feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('cov', cov), ('svm', SVC(kernel='linear', probability=True))])
+    struct_cov_svm = []
+    struct_cov_label = []
+    if STRUCTURAL_COVARIANCE:
+        struc_cov = StructuralCovariance()
+        svm = SVC(kernel='linear', probability=True)
+        struct_cov_svm = [Pipeline([('struc_cov', struc_cov), ('svm', svm)])]
+        struct_cov_label = ['struct_cov']
+    clfs = [svm, pca_svm, feat_sel_svm] + struct_cov_svm
+    clfs_labels = ['svm', 'pca_svm', 'z-thresh_svm'] + struct_cov_label
+    return clfs, clfs_labels
 
 
 def run_ml(X, y, save_folder, num_resample_rounds=NUM_SAMPLING_ITER, n_folds=5):
-    ensure_folder(save_folder)
+    data_funs.ensure_folder(save_folder)
     evaluator = Evaluater()
 
     metrics_labels = evaluator.evaluate_labels()
     metrics = np.zeros((n_folds, num_resample_rounds, len(metrics_labels)))
+    # initialized to -1: if a subject wasn't chosen in the undersampling for the iteration it will remain -1
     predictions = np.ones((y.size, num_resample_rounds)) * -1
 
     roc_curves = []
     best_clf_labels = []
-
     sampling_method = get_sampling_method(X, y)
 
     for id_sampling in xrange(num_resample_rounds):
         print 'Sampling Run: {}/{}'.format(id_sampling + 1, num_resample_rounds)
+
         t1 = time()
         X_sample, y_sample, id_full_sample = sample(X, y, sampling_method)
-        X_sample = apply_masking(X_sample)
-
+        X_sample = data_funs.apply_masking(X_sample)
         cv = get_cross_validator(n_folds)
 
         for id_iter_cv, (train_id, test_id) in enumerate(cv.split(X_sample, y_sample)):
             print '{}/{}'.format(id_iter_cv + 1, n_folds)
-            print '#Train: {} ({}) #Test: {} ({})'.format(train_id.size, y[train_id].sum(),
-                                                          test_id.size, y[test_id].sum())
+            print '#Train: {} (class1: {}) #Test: {} (class1: {})'.format(train_id.size, y[train_id].sum(),
+                                                                          test_id.size, y[test_id].sum())
 
             X_train, y_train = X_sample[train_id], y_sample[train_id]
             X_test, y_test = X_sample[test_id], y_sample[test_id]
 
-            y_pred, y_score, best_model_label = check_diff_models(X_train, y_train, X_test)
+            y_pred, y_score, best_model_label = check_diff_models(train_id, test_id, X_train, y_train, X_test)
             print 'Best model: {}'.format(best_model_label)
             best_clf_labels.append(best_model_label)
 
@@ -166,6 +187,8 @@ def run_ml(X, y, save_folder, num_resample_rounds=NUM_SAMPLING_ITER, n_folds=5):
 
         t2 = time()
         print 'Run took: {:.2f}min'.format((t2 - t1) / 60.)
+
+    print 'Saving data'
     np.savez_compressed(osp.join(save_folder, 'performance_metrics.npz'), metrics=metrics,
                         metrics_labels=metrics_labels)
     np.save(osp.join(save_folder, 'predictions.npy'), predictions)
@@ -191,28 +214,16 @@ def run_classification(X, y, save_folder, label=''):
 
 
 def run():
-    ensure_folder(SAVE_DATA)
-    X_ftd_neurol, y_ftd_neurol, X_ftd_psych, y_ftd_psych, X_neurol_psych, y_neurol_psych, X_ftd_rest, y_ftd_rest = \
-        create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, covariates=COVARIATES, parcellation=PARCELLATION,
-                             smoothing=SMOOTHING)
+    data_funs.ensure_folder(SAVE_DATA)
+    X, y = data_funs.create_data_matrices(SAVE_DATA, load_path=LOAD_DATA, parcellation=PARCELLATION,
+                                          smoothing=SMOOTHING, classification_type=CLASSIFICATION)
 
-    cov_suffix = '_with_Cov' if COVARIATES else '_no_Cov'
-    parc_suffix = '_with_Parc' if PARCELLATION else '_no_Parc'
-    mod_suffix = '_Smoothed' if SMOOTHING else '_Unsmoothed'
-    save_dir_suffix = cov_suffix + parc_suffix + mod_suffix
-
-    if CLASSIFICATION == 'FTDvsPsych':
-        run_classification(X_ftd_psych, y_ftd_psych, SAVE_DIR + '_ftd_psych'
-                           + save_dir_suffix, 'Ftd vs. Psych')
-    elif CLASSIFICATION == 'FTDvsNeurol':
-        run_classification(X_ftd_neurol, y_ftd_neurol, SAVE_DIR + '_ftd_neurol'
-                           + save_dir_suffix, 'Ftd vs. Neurological')
-    elif CLASSIFICATION == 'NeurolvsPsych':
-        run_classification(X_neurol_psych, y_neurol_psych, SAVE_DIR + '_neurol_psych'
-                           + save_dir_suffix, 'Neurological vs. Psych')
-    else:
-        run_classification(X_ftd_rest, y_ftd_rest, SAVE_DIR + '_ftd_rest' + save_dir_suffix, 'Ftd vs. Rest')
-
+    cov_suffix = '_covariates' if COVARIATES else '_no_covariates'
+    save_dir_path = data_funs.create_file_name(PARCELLATION, SMOOTHING,
+                                               initial_identifier=SAVE_DIR + '_' + CLASSIFICATION,
+                                               additional_identifier=cov_suffix,
+                                               file_extension='')
+    run_classification(X, y, save_dir_path, CLASSIFICATION)
 
 if __name__ == '__main__':
     run()
