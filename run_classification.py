@@ -3,8 +3,8 @@ import os.path as osp
 from itertools import product
 
 PARENT_DIR = '/data/shared/bvFTD/Machine_Learning/'
-DATA_DIR = osp.join(PARENT_DIR, 'atlasStructCov')
-SAVE_FOLDER = osp.join(PARENT_DIR, 'results')
+DATA_DIR = osp.join(PARENT_DIR, 'data')
+SAVE_FOLDER = osp.join(PARENT_DIR, 'atlasStrucCov')
 CLASSIFICATIONS = ['FTDvsNeurol', 'FTDvsNeurol', 'FTDvsRest', 'NeurolvsPsych']
 SMOOTHING = [True]
 PARCELLATION = [True]
