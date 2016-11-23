@@ -24,7 +24,7 @@ from data_handling import ensure_folder
 
 
 def plot_histograms(data, title, figtitle, range_x=(0, 1), save_name='results.png'):
-    fig, ax = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(20, 20))
+    fig, ax = plt.subplots(2, 2, sharey=True, figsize=(20, 20))
     ax = ax.ravel()
 
     n_points, n_plots = data.shape
@@ -49,7 +49,7 @@ def plot_histograms(data, title, figtitle, range_x=(0, 1), save_name='results.pn
 
 
 def plot_best_models(best_models, title_plots, save_name='model.png'):
-    fig, ax = plt.subplots(2, 2, sharex=False, sharey=True, figsize=(15, 15))
+    fig, ax = plt.subplots(2, 2, sharex=False, sharey=False, figsize=(15, 15))
     ax = ax.ravel()
 
     n_plots = len(best_models)
@@ -63,6 +63,8 @@ def plot_best_models(best_models, title_plots, save_name='model.png'):
         ax[id_plot].bar(id_labels, counts, tick_label=labels, align='center')
         ax[id_plot].tick_params(axis='both', labelsize=18)
         ax[id_plot].set_title(title_plots[id_plot], fontsize=20)
+        ax[id_plot].set_ylim((0, 100))
+
         if (id_plot == 0) or (id_plot == 2):
             ax[id_plot].set_ylabel('chosen model (%)', fontsize=20)
     if n_plots < ax.size:
