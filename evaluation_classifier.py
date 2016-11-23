@@ -35,7 +35,7 @@ class Evaluater(object):
             self.evaluation_string = 'Accuracy: {balanced_accuracy:.2f}, AUC: {AUC:.2f}, F1-score: {F1:.2f}, Recall: ' \
                                      '{recall:.2f}, Precision: {precision:.2f}, Sensitivity: {sensitivity:.2f}, ' \
                                      'Specificity: {specificity:.2f}, ' \
-                                     'PPV: {positive_predictive_value:.2f}' \
+                                     'PPV: {positive_predictive_value:.2f}, ' \
                                      'NPV: {negative_predictive_value:.2f}'.format(**self.results)
         print self.evaluation_string
 
@@ -75,6 +75,9 @@ class Evaluater(object):
     def __npv(y_true, y_pred):
         # noinspection PyTypeChecker
         npv = np.sum((y_true == 0) & (y_pred == 0)) / np.sum(y_pred == 0, dtype=np.float)
+        if np.isnan(npv):
+            return 0
+        return npv
 
     @staticmethod
     def __specificity(y_true, y_pred):
