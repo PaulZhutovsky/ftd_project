@@ -16,6 +16,7 @@ class StructuralCovariance(object):
         n_subj, n_dims = X.shape
         X = self.standardize_subjects(X)
         X_standard = self.standardize_rois(X)
+        # excluding the diagonal
         ids_triu = np.triu_indices(n_dims, k=1)
         structural_covariance = np.zeros((n_subj, ids_triu[0].size))
 
