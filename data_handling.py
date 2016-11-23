@@ -1,4 +1,5 @@
 import os
+from itertools import product
 from glob import glob
 from os import path as osp
 
@@ -6,7 +7,10 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 
-from parcellate_NIFTI import parcellate_nifti
+# avoid cyclic imports
+import parcellate_NIFTI
+import FTD_classification as clf_script
+
 
 PARENT_DIR_SMOOTHED = '/data/shared/bvFTD/VBM/default_LOF5/data'
 PARENT_DIR_UNSMOOTHED = '/data/shared/bvFTD/VBM/default_non_modulated_LOF5/data'
@@ -14,8 +18,14 @@ PARENT_DIR_UNSMOOTHED = '/data/shared/bvFTD/VBM/default_non_modulated_LOF5/data'
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
 SIZE_VOXELS = 121 * 145 * 121
 
-ftd_csv_file = '/data/shared/bvFTD/Machine_Learning/data/AMC_VUMC_bvFTD.csv'
-TIV_csv_file = '/data/shared/bvFTD/Machine_Learning/data/TIV_ML_LOF5.csv'
+# ftd_csv_file = '/data/shared/bvFTD/Machine_Learning/data/AMC_VUMC_bvFTD.csv'
+# TIV_csv_file = '/data/shared/bvFTD/Machine_Learning/data/TIV_ML_LOF5.csv'
+
+
+def create_data_path(parcellation, smoothing, additional_identifier='', file_extension='.npy'):
+    atlas_suffix = '_atlas' if parcellation else '_voxel_wise'
+    smoothing_suffix = '_smoothed' if smoothing else '_unsmoothed'
+    return 'data_set' + atlas_suffix + smoothing_suffix + additional_identifier + file_extension
 
 
 def ensure_folder(folder_dir):
@@ -29,51 +39,36 @@ def get_file_path(class_folder, smoothing=False):
     return sorted(glob(osp.join(PARENT_DIR_UNSMOOTHED, class_folder, '*', 'structural', 'wc1*')))
 
 
-def load_data(data_path):
+def load_data(data_path, keepdims=False):
+    if keepdims:
+        return nib.load(data_path).get_data().astype(np.float64)
     return nib.load(data_path).get_data().astype(np.float64).ravel()
 
 
-def extract_IDs(ftd_csv_df, files_to_load_df):
-    # separate all file path strings with the slash character and extract element corresponding to subject ID
-    select_IDs = np.array(files_to_load_df['raw'].str.split('/').str.get(8), dtype=int)
-    ftd_csv_df = ftd_csv_df[ftd_csv_df.ID_D.isin(list(select_IDs))]
-    return ftd_csv_df
-
-
-def load_covariates(files_to_load):
-    # semicolon used as separator because of SPSS formatting
-    ftd_csv_df = pd.read_csv(ftd_csv_file, sep=';')
-    files_to_load_df = pd.DataFrame(files_to_load, columns=['raw'])
-    ftd_csv_df = extract_IDs(ftd_csv_df, files_to_load_df)
-
-    ftd_csv_df.Sex.loc[ftd_csv_df.Sex == 'm'], ftd_csv_df.Sex.loc[ftd_csv_df.Sex == 'f'] = 0., 1.
-    ftd_csv_df.Sex = ftd_csv_df.Sex.astype(np.float)
-    ftd_csv_df.age_Dx_T0 = ftd_csv_df.age_Dx_T0.str.replace(',', '.').astype(np.float)
-
-    X_sex_age = ftd_csv_df.loc[:, ['age_Dx_T0', 'Sex']].as_matrix()
-    X_TIV = pd.read_csv(TIV_csv_file, header=None)
-
-    # verify whether same subjects are loaded
-    X = np.concatenate((X_TIV, X_sex_age), axis=1)
-
-    return X
-
-
-def load_all_data(files_to_load, create_covariates, parcellation):
+def load_all_data(files_to_load, parcellation=False):
     if parcellation:
-        data = parcellate_nifti(files_to_load)
-    else:
-        data = np.zeros((len(files_to_load), SIZE_VOXELS))
-        for i, file_path in enumerate(files_to_load):
-            data[i, :] = load_data(file_path)
+        return parcellate_NIFTI.run_parcellation(files_to_load)
 
-    if create_covariates:
-        X_covariates = load_covariates(files_to_load)
-        data = np.concatenate((data, X_covariates), axis=1)
+    data = np.zeros((len(files_to_load), SIZE_VOXELS))
+    for i, file_path in enumerate(files_to_load):
+        data[i, :] = load_data(file_path)
     return data
 
 
 def create_labels(class1_num, class2_num, class3_num):
+    """
+    General idea: create a boolean matrix of class1_num + class2_num + class3_num x 4 elements.
+     - First column will be True for the first class1_num elements
+     - Second column will be True for the class1_num until class1_num + class2_num elements
+     - Third column will be True for the class1_num + class2_num until class1_num + class2_num + class3_num (end)
+       elements
+     - Forth column will be True for all elements starting at class1_num
+
+    :param class1_num:      e.g. amount of FTD patients
+    :param class2_num:      e.g. amount of neurological patients
+    :param class3_num:      e.g. amount of psychiatric patients
+    :return:                boolean array
+    """
     y = np.zeros((class1_num + class2_num + class3_num, 4), dtype=np.bool)
     y[:class1_num, 0] = True
     y[class1_num:class1_num + class2_num, 1] = True
@@ -83,8 +78,8 @@ def create_labels(class1_num, class2_num, class3_num):
 
 
 def create_classification_data(data, class_labels_df, label1, label2):
-    class1_labels = class_labels_df[label1].as_matrix().astype(np.bool)
-    class2_labels = class_labels_df[label2].as_matrix().astype(np.bool)
+    class1_labels = class_labels_df[label1].values.astype(np.bool)
+    class2_labels = class_labels_df[label2].values.astype(np.bool)
     size_class1 = class1_labels.sum()
     size_class2 = class2_labels.sum()
 
@@ -93,37 +88,54 @@ def create_classification_data(data, class_labels_df, label1, label2):
     return X, y
 
 
-def create_data_matrices(save_path, load_path='', covariates=False, parcellation=False, smoothing=False):
-    cov_suffix = '_with_Cov' if covariates else '_no_Cov'
-    parc_suffix = '_with_Parc' if parcellation else '_no_Parc'
-    mod_suffix = '_Smoothed' if smoothing else '_Unsmoothed'
-    data_filename = 'data_set' + cov_suffix + parc_suffix + mod_suffix
+def extract_subject_ids(path_files):
+    path_files = np.array(path_files)
+    path_files = np.char.asarray(np.char.split(path_files, os.sep))
+    return path_files[np.char.isdigit(path_files)]
+
+
+def create_data_matrices(save_path, load_path='', parcellation=False, smoothing=False,
+                         classification_type='FTDvsPsych'):
+    data_filename = create_data_path(parcellation, smoothing)
 
     if load_path:
         data = np.load(osp.join(load_path, data_filename))
         class_labels_df = pd.read_csv(osp.join(load_path, 'class_labels.csv'))
     else:
-        ftd_files = get_file_path(CLASSES_TRANSFORM['ftd'], smoothing=smoothing)
-        neurological_files = get_file_path(CLASSES_TRANSFORM['neurol'], smoothing=smoothing)
-        psychiatry_files = get_file_path(CLASSES_TRANSFORM['psych'], smoothing=smoothing)
+        class_labels_df, data = initialize_and_load_data(data_filename, parcellation, save_path, smoothing)
 
-        size_classes = {'ftd': len(ftd_files), 'neurol': len(neurological_files), 'psych': len(psychiatry_files)}
+    if classification_type == 'FTDvsPsych':
+        X, y = create_classification_data(data, class_labels_df, 'ftd', 'psych')
+    elif classification_type == 'FTDvsNeurol':
+        X, y = create_classification_data(data, class_labels_df, 'ftd', 'neurol')
+    elif classification_type == 'NeurolvsPsych':
+        X, y = create_classification_data(data, class_labels_df, 'neurol', 'psych')
+    elif classification_type == 'FTDvsRest':
+        X, y = create_classification_data(data, class_labels_df, 'ftd', 'rest')
+    else:
+        raise RuntimeError('Unrecognized classification: {}. '.format(classification_type) +
+                           'Possible values are: "FTDvsPsych", "FTDvsNeurol", "NeurolvsPsych", "FTDvsRest"')
+    return X, y
 
-        data = load_all_data(ftd_files + neurological_files + psychiatry_files,
-                             create_covariates=covariates, parcellation=parcellation)
-        class_labels = create_labels(size_classes['ftd'], size_classes['neurol'], size_classes['psych'])
 
-        class_labels_df = pd.DataFrame(data=class_labels, columns=['ftd', 'neurol', 'psych', 'rest'])
+def initialize_and_load_data(data_filename, parcellation, save_path, smoothing):
+    ftd_files = get_file_path(CLASSES_TRANSFORM['ftd'], smoothing=smoothing)
+    neurological_files = get_file_path(CLASSES_TRANSFORM['neurol'], smoothing=smoothing)
+    psychiatry_files = get_file_path(CLASSES_TRANSFORM['psych'], smoothing=smoothing)
 
-        np.save(osp.join(save_path, data_filename), data)
-        class_labels_df.to_csv(osp.join(save_path, 'class_labels.csv'), index=False)
+    all_files_to_load = ftd_files + neurological_files + psychiatry_files
+    size_classes = [len(ftd_files), len(neurological_files), len(psychiatry_files)]
 
-    X_ftd_neurol, y_ftd_neurol = create_classification_data(data, class_labels_df, 'ftd', 'neurol')
-    X_ftd_psych, y_ftd_psych = create_classification_data(data, class_labels_df, 'ftd', 'psych')
-    X_neurol_psych, y_neurol_psych = create_classification_data(data, class_labels_df, 'neurol', 'psych')
-    X_ftd_rest, y_ftd_rest = create_classification_data(data, class_labels_df, 'ftd', 'rest')
+    data = load_all_data(all_files_to_load, parcellation=parcellation)
+    subj_ids = extract_subject_ids(all_files_to_load)
+    class_labels = create_labels(*size_classes)
+    subj_info = np.column_stack((subj_ids, class_labels))
 
-    return X_ftd_neurol, y_ftd_neurol, X_ftd_psych, y_ftd_psych, X_neurol_psych, y_neurol_psych, X_ftd_rest, y_ftd_rest
+    class_labels_df = pd.DataFrame(data=subj_info, columns=['subj_id', 'ftd', 'neurol', 'psych', 'rest'])
+
+    np.save(osp.join(save_path, data_filename), data)
+    class_labels_df.to_csv(osp.join(save_path, 'class_labels.csv'), index=False)
+    return class_labels_df, data
 
 
 def apply_masking(X):
@@ -131,3 +143,22 @@ def apply_masking(X):
     # voxels which are 0 across ALL subjects
     id_keep = ~np.all(X == 0, axis=0)
     return X[:, id_keep]
+
+
+def run():
+    """
+    Creates ALL data sets which we are currently using
+    """
+    smoothing_or_not = [True, False]
+    parcellation_or_not = [True, False]
+    # we just need one since the matrix which will be created contains all of them
+    clf_type = 'FTDvsPsych'
+
+    for smoothing, parcellation in product(smoothing_or_not, parcellation_or_not):
+        print 'Smoothing: {} Parcellation: {}'.format(smoothing, parcellation)
+        _, _ = create_data_matrices(clf_script.SAVE_DATA, load_path='', parcellation=parcellation, smoothing=smoothing,
+                                    classification_type=clf_type)
+
+
+if __name__ == '__main__':
+    run()
