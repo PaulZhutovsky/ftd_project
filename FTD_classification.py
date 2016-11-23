@@ -68,8 +68,9 @@ def inner_loop_iteration(clf, id_train, id_test, X, y, use_covariates=COVARIATES
 
 
 def check_diff_models(train_id, test_id, X_inner_cv, y_inner_cv, X_test_outer_cv, n_folds=5, covariates=COVARIATES,
-                      structural_covariance=STRUCTURAL_COVARIANCE):
-    clfs, clfs_labels = get_models_to_check(covariates=covariates, structural_covariance=structural_covariance)
+                      structural_covariance=STRUCTURAL_COVARIANCE, parcellation=PARCELLATION):
+    clfs, clfs_labels = get_models_to_check(covariates=covariates, structural_covariance=structural_covariance,
+                                            parcellation=parcellation)
     # the random state is added to ensure the usage of the same CV/fold order for the models in question to get the
     # 'fairest' comparison possible. To make it explicit we seed the cross-validator with the same random_state
     cv = get_cross_validator(n_folds, random_state=int(time()))
@@ -95,16 +96,17 @@ def check_diff_models(train_id, test_id, X_inner_cv, y_inner_cv, X_test_outer_cv
     return y_pred, y_score, best_clf_label
 
 
-def get_models_to_check(covariates=COVARIATES, structural_covariance=STRUCTURAL_COVARIANCE):
+def get_models_to_check(covariates=COVARIATES, structural_covariance=STRUCTURAL_COVARIANCE, z_threshold=z_THRESHOLD,
+                        parcellation=PARCELLATION):
     if covariates:
-        return use_covariates(structural_covariance=structural_covariance)
+        return use_covariates(structural_covariance=structural_covariance, parcellation=parcellation)
 
     svm = SVC(kernel='linear', probability=True)
 
     pca = PCA(n_components=0.9)
     pca_svm = Pipeline([('pca', pca), ('svm', SVC(kernel='linear', probability=True))])
 
-    feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
+    feat_sel = FeatureSelector(z_thresh=z_threshold[parcellation])
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('svm', SVC(kernel='linear', probability=True))])
 
     struct_cov_svm, struct_cov_label = [], []
@@ -120,7 +122,7 @@ def get_models_to_check(covariates=COVARIATES, structural_covariance=STRUCTURAL_
     return clfs, clfs_labels
 
 
-def use_covariates(structural_covariance=STRUCTURAL_COVARIANCE):
+def use_covariates(structural_covariance=STRUCTURAL_COVARIANCE, parcellation=PARCELLATION, z_threshold=z_THRESHOLD):
     """
     TODO: NOT WORKING?FINISHED YET!
     """
@@ -130,7 +132,7 @@ def use_covariates(structural_covariance=STRUCTURAL_COVARIANCE):
     pca = PCA(n_components=0.9)
     cov = CovariateSelector()
     pca_svm = Pipeline([('pca', pca), ('cov', cov), ('svm', SVC(kernel='linear', probability=True))])
-    feat_sel = FeatureSelector(z_thresh=z_THRESHOLD[PARCELLATION])
+    feat_sel = FeatureSelector(z_thresh=z_threshold[parcellation])
     cov = CovariateSelector()
     feat_sel_svm = Pipeline([('feat_sel', feat_sel), ('cov', cov), ('svm', SVC(kernel='linear', probability=True))])
     struct_cov_svm = []
@@ -146,7 +148,7 @@ def use_covariates(structural_covariance=STRUCTURAL_COVARIANCE):
 
 
 def run_ml(X, y, save_folder, num_resample_rounds=NUM_SAMPLING_ITER, n_folds=5, covariates=COVARIATES,
-           structural_covariance=STRUCTURAL_COVARIANCE):
+           structural_covariance=STRUCTURAL_COVARIANCE, parcellation=PARCELLATION):
     data_funs.ensure_folder(save_folder)
     evaluator = Evaluater()
 
@@ -177,7 +179,8 @@ def run_ml(X, y, save_folder, num_resample_rounds=NUM_SAMPLING_ITER, n_folds=5, 
 
             y_pred, y_score, best_model_label = check_diff_models(train_id, test_id, X_train, y_train, X_test,
                                                                   covariates=covariates,
-                                                                  structural_covariance=structural_covariance)
+                                                                  structural_covariance=structural_covariance,
+                                                                  parcellation=parcellation)
             print 'Best model: {}'.format(best_model_label)
             best_clf_labels.append(best_model_label)
 
@@ -213,9 +216,11 @@ def run_classification(X, y, save_folder, label='', smoothing=SMOOTHING, covaria
     print 'Smoothing enabled: {}'.format(smoothing)
     print 'Covariates enabled: {}'.format(covariates)
     print 'Parcellation enabled: {}'.format(parcellation)
+    print 'Structural covariance enabled: {}'.format(structural_covariance)
     print 'Started:', datetime.now()
     t_start = time()
-    run_ml(X, y, save_folder, num_resample_rounds=num_sampling_rounds, structural_covariance=structural_covariance)
+    run_ml(X, y, save_folder, num_resample_rounds=num_sampling_rounds, structural_covariance=structural_covariance,
+           parcellation=parcellation)
     t_end = time()
     print 'Time taken: {:.2f}h'.format((t_end - t_start) / 3600.)
 
