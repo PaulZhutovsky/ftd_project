@@ -20,6 +20,9 @@ class FeatureSelector(object):
 
         self.chosen_ftrs = np.abs(z_scores_diff) >= self.z_thresh
 
+        if not np.any(self.chosen_ftrs):
+            raise RuntimeError('No features survived the criterion! Adjust z-threshold')
+
     def transform(self, X, y=None):
         return X[:, self.chosen_ftrs]
 
