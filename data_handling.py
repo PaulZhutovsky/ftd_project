@@ -18,14 +18,12 @@ PARENT_DIR_UNSMOOTHED = '/data/shared/bvFTD/VBM/default_non_modulated_LOF5/data'
 CLASSES_TRANSFORM = {'ftd': 'bvFTD', 'neurol': 'neurological', 'psych': 'psychiatric'}
 SIZE_VOXELS = 121 * 145 * 121
 
-# ftd_csv_file = '/data/shared/bvFTD/Machine_Learning/data/AMC_VUMC_bvFTD.csv'
-# TIV_csv_file = '/data/shared/bvFTD/Machine_Learning/data/TIV_ML_LOF5.csv'
 
-
-def create_data_path(parcellation, smoothing, additional_identifier='', file_extension='.npy'):
+def create_file_name(parcellation, smoothing, initial_identifier='data_set', additional_identifier='',
+                     file_extension='.npy'):
     atlas_suffix = '_atlas' if parcellation else '_voxel_wise'
     smoothing_suffix = '_smoothed' if smoothing else '_unsmoothed'
-    return 'data_set' + atlas_suffix + smoothing_suffix + additional_identifier + file_extension
+    return initial_identifier + atlas_suffix + smoothing_suffix + additional_identifier + file_extension
 
 
 def ensure_folder(folder_dir):
@@ -96,7 +94,7 @@ def extract_subject_ids(path_files):
 
 def create_data_matrices(save_path, load_path='', parcellation=False, smoothing=False,
                          classification_type='FTDvsPsych'):
-    data_filename = create_data_path(parcellation, smoothing)
+    data_filename = create_file_name(parcellation, smoothing)
 
     if load_path:
         data = np.load(osp.join(load_path, data_filename))
